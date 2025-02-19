@@ -26,6 +26,8 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // ** Business Logic Methods **
+
     public User createUser(User user) {
         // 1. Validate user input
         // Check for blank fields (name, surname, email, password, role) Using a helper
@@ -86,7 +88,15 @@ public class UserService {
         userRepository.deleteById(id);
     }
 
-    // ** Validation Helper Methods **
+    // ** Validation / Helper Methods **
+
+    private boolean isValidUserData(User user) { // Helper to check for blank fields
+        return StringUtils.hasText(user.getName()) &&
+                StringUtils.hasText(user.getSurname()) &&
+                StringUtils.hasText(user.getEmail()) &&
+                StringUtils.hasText(user.getPassword()) &&
+                user.getRole() != null; // Assuming Role is an enum and cannot be null if required in DB
+    }
 
     private boolean isValidEmail(String email) {
         if (!StringUtils.hasText(email)) { // Check for null or empty using Spring's StringUtils
@@ -114,14 +124,6 @@ public class UserService {
         Pattern pattern = Pattern.compile(passwordRegex);
         Matcher matcher = pattern.matcher(password);
         return matcher.matches();
-    }
-
-    private boolean isValidUserData(User user) { // Helper to check for blank fields
-        return StringUtils.hasText(user.getName()) &&
-                StringUtils.hasText(user.getSurname()) &&
-                StringUtils.hasText(user.getEmail()) &&
-                StringUtils.hasText(user.getPassword()) &&
-                user.getRole() != null; // Assuming Role is an enum and cannot be null if required in DB
     }
 
 }
