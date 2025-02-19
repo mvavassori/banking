@@ -33,7 +33,7 @@ public class User {
 
     @Enumerated(EnumType.STRING) // Store the enum as a string in the database
     @Column(nullable = false, name = "role")
-    private UserRole role;
+    private UserRole role; // ADMIN, USER
 
     @CreationTimestamp // Automatically sets the timestamp when the entity is created
     @Column(name = "created_at") // Explicitly name the column 'created_at'

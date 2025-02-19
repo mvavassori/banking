@@ -22,16 +22,18 @@ public class Account {
     @Column(nullable = false, unique = true, name = "account_number")
     private String accountNumber;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, name = "account_type")
-    private AccountType accountType;
+    private AccountType accountType; // CHECKING, SAVINGS
 
     @Column(nullable = false)
     private BigDecimal balance;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AccountCurrency currency;
 
-    // **Relationship with User (Many-to-One)**
+    // Relationship with User (Many-to-One)
     // Foreign key column in accounts table referencing users table's 'id'
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
