@@ -2,15 +2,83 @@ package com.marcovavassori.banking.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-// `@Configuration` Marks this class as a configuration class for Spring. I.e. a source of bean definitions
+import com.marcovavassori.banking.filters.JwtAuthenticationFilter;
+import com.marcovavassori.banking.services.UserService;
+
+/**
+ * Central security configuration class for the application.
+ * 
+ * @Configuration: Indicates this is a Spring configuration class
+ * @EnableWebSecurity: Enables Spring Security's web security support
+ **/
 @Configuration
+@EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean // Indicates that a method produces a bean to be managed by the Spring container
+    private final UserService userService;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(UserService userService, JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.userService = userService;
+    }
+
+    /**
+     * Defines the password encoding algorithm for the application.
+     * BCrypt is a strong one-way hashing algorithm designed for passwords.
+     */
+    @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // BCryptPasswordEncoder is a strong password hashing algorithm
+        return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Configures the security filter chain which defines the security rules
+     * for different HTTP requests in the application.
+     */
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                // Disable CSRF (Cross Site Request Forgery) protection
+                // Safe for REST APIs that use JWT tokens
+                .csrf(AbstractHttpConfigurer::disable)
+
+                // Configure authorization rules for HTTP requests
+                .authorizeHttpRequests(
+                        req -> req
+                                // Public endpoints that don't require authentication
+                                .requestMatchers("/signin/**", "/signup/**").permitAll()
+                                // All other endpoints require authentication
+                                .anyRequest().authenticated())
+                // Set the service to load user details when authenticating
+                .userDetailsService(userService)
+
+                // Add our custom JWT filter before the standard authentication filter
+                // This ensures JWT authentication happens before username/password
+                // authentication
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
+    }
+
+    /**
+     * Creates the authentication manager bean.
+     * The authentication manager is responsible for processing authentication
+     * requests.
+     * It uses the configured UserDetailsService and PasswordEncoder to authenticate
+     * users.
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
     }
 }

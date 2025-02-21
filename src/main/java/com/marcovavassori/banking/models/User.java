@@ -1,10 +1,14 @@
 package com.marcovavassori.banking.models;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.marcovavassori.banking.models.enums.UserRole;
@@ -13,7 +17,7 @@ import jakarta.persistence.*; // JPA annotations
 
 @Entity // Marks User as a JPA (Java Persistance Api) entity
 @Table(name = "users") // Explicitly name the database table 'users'
-public class User {
+public class User implements UserDetails {
 
     @Id // Marks 'id' as the primary key
     @GeneratedValue(strategy = GenerationType.IDENTITY) // Auto-increment strategy for MySQL
@@ -136,6 +140,42 @@ public class User {
 
     public void setAccounts(List<Account> accounts) { // Setter for the accounts list
         this.accounts = accounts;
+    }
+
+    // ** UserDetails interface methods **
+    // These methods are required by Spring Security to authenticate users
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority(role.name())); // Return the role as a GrantedAuthority
+    }
+
+    @Override
+    public String getUsername() {
+        return email; // Use the email as the username
+    }
+
+    // You can optimize the logic of these methods below based on your application
+    // requirements, for now we return true for all of them
+
+    @Override
+    public boolean isEnabled() {
+        return true; // Always return true for now
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true; // Always return true for now
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true; // Always return true for now
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true; // Always return true for now
     }
 
 }

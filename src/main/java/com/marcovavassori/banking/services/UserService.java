@@ -1,20 +1,21 @@
 package com.marcovavassori.banking.services;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import com.marcovavassori.banking.exceptions.UserNotFoundException;
 import com.marcovavassori.banking.models.User;
 import com.marcovavassori.banking.repositories.UserRepository;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// Services are the classes that contain the business logic of the application
-
 @Service
-public class UserService {
+public class UserService implements UserDetailsService {
 
     // Declare dependencies
     private final UserRepository userRepository;
@@ -74,18 +75,26 @@ public class UserService {
     public User getUser(Long id) {
 
         return userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(id));
     }
 
     public User getUserByEmailWithAccounts(String email) {
 
         return userRepository.findByEmailWithAccounts(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
 
     public void deleteUser(Long id) {
-
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
+        }
         userRepository.deleteById(id);
+    }
+
+    // This method is required by the UserDetailsService interface
+    public UserDetails loadUserByUsername(String email) {
+        return userRepository.findByEmail(email) // we are using the email as the username
+                .orElseThrow(() -> new UserNotFoundException(email));
     }
 
     // ** Validation / Helper Methods **
