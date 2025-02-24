@@ -57,7 +57,13 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         req -> req
                                 // Public endpoints that don't require authentication
-                                .requestMatchers("/signin/**", "/signup/**").permitAll()
+                                .requestMatchers(
+                                        "/", // Home page
+                                        "/signin/**", // Sign in endpoints
+                                        "/signup/**", // Sign up endpoints
+                                        "/error", // Error pages
+                                        "/public/**" // Any other public resources
+                                ).permitAll()
                                 // All other endpoints require authentication
                                 .anyRequest().authenticated())
                 // Set the service to load user details when authenticating
