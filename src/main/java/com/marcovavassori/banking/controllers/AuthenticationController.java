@@ -10,6 +10,9 @@ import com.marcovavassori.banking.dtos.SignInRequest;
 import com.marcovavassori.banking.dtos.SignUpRequest;
 import com.marcovavassori.banking.services.AuthenticationService;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 @RestController
 public class AuthenticationController {
 
@@ -29,4 +32,9 @@ public class AuthenticationController {
         return ResponseEntity.ok(authenticationService.signIn(request));
     }
 
+    @PostMapping("/refresh-token")
+    public ResponseEntity<AuthenticationResponse> refreshToken(HttpServletRequest request,
+            HttpServletResponse response) {
+        return authenticationService.refreshToken(request, response);
+    }
 }

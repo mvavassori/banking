@@ -6,6 +6,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -23,6 +25,9 @@ import com.marcovavassori.banking.exceptions.ValidationException;
 import com.marcovavassori.banking.models.User;
 import com.marcovavassori.banking.models.enums.UserRole;
 import com.marcovavassori.banking.repositories.UserRepository;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Service
 public class AuthenticationService {
@@ -65,12 +70,20 @@ public class AuthenticationService {
             // 4. Save the user to the database
             User savedUser = userRepository.save(user);
 
-            // 5. Generate the token
-            String token = jwtService.generateToken(user.getEmail());
+            // 5. Generate the accessToken and refreshToken
+            String accessToken = jwtService.generateAccessToken(user.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
-            // 6. Return the response
+            // 6. Get the expiration times for the tokens
+            Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
+            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(refreshToken);
+
+            // 7. Return the response
             return new AuthenticationResponse(
-                    token,
+                    accessToken,
+                    refreshToken,
+                    accessTokenExpiration,
+                    refreshTokenExpiration,
                     savedUser.getId(),
                     savedUser.getEmail(),
                     savedUser.getName(),
@@ -95,12 +108,20 @@ public class AuthenticationService {
             User user = userRepository.findByEmail(request.email())
                     .orElseThrow(() -> new UserNotFoundException(request.email()));
 
-            // Generate token
-            String token = jwtService.generateToken(user.getEmail());
+            // Generate the accessToken and refreshToken
+            String accessToken = jwtService.generateAccessToken(user.getEmail());
+            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+
+            // Get the expiration times for the tokens
+            Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
+            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(refreshToken);
 
             // Return the response
             return new AuthenticationResponse(
-                    token,
+                    accessToken,
+                    refreshToken,
+                    accessTokenExpiration,
+                    refreshTokenExpiration,
                     user.getId(),
                     user.getEmail(),
                     user.getName(),
@@ -109,6 +130,53 @@ public class AuthenticationService {
         } catch (AuthenticationException e) {
             throw new InvalidRequestException("Invalid email or password");
         }
+    }
+
+    public ResponseEntity<AuthenticationResponse> refreshToken(HttpServletRequest request,
+            HttpServletResponse response) {
+
+        // Get the authorization header from the request
+        String authorizationHeader = request.getHeader("Authorization");
+        // Check if the authrizationHeader is valid
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            return new ResponseEntity<AuthenticationResponse>(HttpStatus.UNAUTHORIZED);
+        }
+
+        // Extract the refreshToken from the authorization header
+        String refreshToken = authorizationHeader.substring(7);
+
+        // Extract the username from the refreshToken
+        String username = jwtService.extractUsernameFromToken(refreshToken);
+
+        // Check if the user exists in the database
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new UserNotFoundException(username));
+
+        // Check if the refreshToken is valid
+        if (jwtService.validateRefreshToken(refreshToken, user)) {
+            // Generate a new accessToken
+            String accessToken = jwtService.generateAccessToken(user.getEmail());
+
+            // Get the expiration time for the accessToken
+            Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
+
+            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(refreshToken);
+
+            // Return the response
+            return ResponseEntity.ok(new AuthenticationResponse(
+                    accessToken,
+                    refreshToken,
+                    accessTokenExpiration,
+                    refreshTokenExpiration,
+                    user.getId(),
+                    user.getEmail(),
+                    user.getName(),
+                    user.getSurname(),
+                    user.getRole().name()));
+        } else {
+            return new ResponseEntity<AuthenticationResponse>(HttpStatus.UNAUTHORIZED);
+        }
+
     }
 
     // ** Validation / Helper Methods **

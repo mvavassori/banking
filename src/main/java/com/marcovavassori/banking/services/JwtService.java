@@ -19,11 +19,21 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secret;
 
-    @Value("${jwt.expiration}")
-    private Long expiration;
+    @Value("${jwt.expiration.accessToken}")
+    private Long accessTokenExpiration;
 
-    // Generate a token for a user
-    public String generateToken(String username) {
+    @Value("${jwt.expiration.refreshToken}")
+    private Long refreshTokenExpiration;
+
+    public String generateAccessToken(String username) {
+        return generateToken(username, accessTokenExpiration);
+    }
+
+    public String generateRefreshToken(String username) {
+        return generateToken(username, refreshTokenExpiration);
+    }
+
+    private String generateToken(String username, Long expiration) {
         return Jwts.builder()
                 .subject(username)
                 .issuedAt(new Date(System.currentTimeMillis()))
@@ -54,11 +64,22 @@ public class JwtService {
         return extractClaimFromToken(token, Claims::getExpiration);
     }
 
+    public Long getExpirationTimeInSeconds(String token) {
+        Date expirationDate = extractExpirationDateFromToken(token);
+        Date now = new Date();
+        return (expirationDate.getTime() - now.getTime()) / 1000; // Convert milliseconds to seconds for client
+    }
+
     private boolean isTokenExpired(String token) {
         return extractExpirationDateFromToken(token).before(new Date());
     }
 
-    public boolean validateToken(String token, UserDetails user) {
+    public boolean validateAccessToken(String token, UserDetails user) {
+        String username = extractUsernameFromToken(token);
+        return username.equals(user.getUsername()) && !isTokenExpired(token);
+    }
+
+    public boolean validateRefreshToken(String token, UserDetails user) {
         String username = extractUsernameFromToken(token);
         return username.equals(user.getUsername()) && !isTokenExpired(token);
     }
