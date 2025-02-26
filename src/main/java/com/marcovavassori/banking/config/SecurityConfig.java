@@ -2,14 +2,17 @@ package com.marcovavassori.banking.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.marcovavassori.banking.filters.JwtAuthenticationFilter;
@@ -27,10 +30,13 @@ public class SecurityConfig {
 
     private final UserService userService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
 
-    public SecurityConfig(UserService userService, JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(UserService userService, JwtAuthenticationFilter jwtAuthenticationFilter,
+            CustomAccessDeniedHandler customAccessDeniedHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.userService = userService;
+        this.customAccessDeniedHandler = customAccessDeniedHandler;
     }
 
     /**
@@ -52,7 +58,9 @@ public class SecurityConfig {
                 // Disable CSRF (Cross Site Request Forgery) protection
                 // Safe for REST APIs that use JWT tokens
                 .csrf(AbstractHttpConfigurer::disable)
-
+                // Add sessionManagement configuration
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // Configure authorization rules for HTTP requests
                 .authorizeHttpRequests(
                         req -> req
@@ -62,13 +70,18 @@ public class SecurityConfig {
                                         "/signin/**", // Sign in endpoints
                                         "/signup/**", // Sign up endpoints
                                         "/error", // Error pages
-                                        "/public/**" // Any other public resources
+                                        "/refresh-token" // Refresh token endpoint
                                 ).permitAll()
+                                .requestMatchers("/admin/**").hasAuthority("ADMIN")
                                 // All other endpoints require authentication
                                 .anyRequest().authenticated())
                 // Set the service to load user details when authenticating
                 .userDetailsService(userService)
-
+                .exceptionHandling(e -> e.accessDeniedHandler(customAccessDeniedHandler)
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                .exceptionHandling(e -> e
+                        .accessDeniedHandler(customAccessDeniedHandler)
+                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 // Add our custom JWT filter before the standard authentication filter
                 // This ensures JWT authentication happens before username/password
                 // authentication
