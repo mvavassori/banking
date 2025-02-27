@@ -16,14 +16,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.marcovavassori.banking.dtos.AuthenticationResponse;
+import com.marcovavassori.banking.dtos.ChangePasswordRequest;
 import com.marcovavassori.banking.dtos.SignInRequest;
 import com.marcovavassori.banking.dtos.SignUpRequest;
 import com.marcovavassori.banking.exceptions.EmailAlreadyExistsException;
+import com.marcovavassori.banking.exceptions.InvalidRefreshTokenException;
 import com.marcovavassori.banking.exceptions.InvalidRequestException;
 import com.marcovavassori.banking.exceptions.UserNotFoundException;
 import com.marcovavassori.banking.exceptions.ValidationException;
+import com.marcovavassori.banking.models.RefreshToken;
 import com.marcovavassori.banking.models.User;
 import com.marcovavassori.banking.models.enums.UserRole;
+import com.marcovavassori.banking.repositories.RefreshTokenRepository;
 import com.marcovavassori.banking.repositories.UserRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,54 +40,64 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
     public AuthenticationService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
-            JwtService jwtService) {
+            JwtService jwtService,
+            RefreshTokenService refreshTokenService, RefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
+        this.refreshTokenService = refreshTokenService;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    public AuthenticationResponse signUp(SignUpRequest request) {
+    public AuthenticationResponse signUp(SignUpRequest signUpRequest, HttpServletRequest httpRequest) {
         // 1. Validate request data
-        validateSignUpRequest(request);
+        validateSignUpRequest(signUpRequest);
 
         // 2. Check if email is already in use
-        if (userRepository.findByEmail(request.email()).isPresent()) {
+        if (userRepository.findByEmail(signUpRequest.email()).isPresent()) {
             throw new EmailAlreadyExistsException();
         }
 
         // 3. Create User entity from request
         User user = new User();
-        user.setName(request.name());
-        user.setSurname(request.surname());
-        user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password()));
-        user.setRole(UserRole.valueOf(request.role().toUpperCase()));
+        user.setName(signUpRequest.name());
+        user.setSurname(signUpRequest.surname());
+        user.setEmail(signUpRequest.email());
+        user.setPassword(passwordEncoder.encode(signUpRequest.password()));
+        user.setRole(UserRole.valueOf(signUpRequest.role().toUpperCase()));
 
         try {
             // 4. Save the user to the database
             User savedUser = userRepository.save(user);
 
-            // 5. Generate the accessToken and refreshToken
-            String accessToken = jwtService.generateAccessToken(user.getEmail());
-            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            // 5. Generate the accessToken
+            String accessToken = jwtService.generateAccessToken(user);
 
-            // 6. Get the expiration times for the tokens
+            // 6. Create a new refreshToken
+            RefreshToken refreshTokenEntity = refreshTokenService.createRefreshToken(savedUser, httpRequest);
+
+            // 7. Get the refreshToken token string
+            String refreshToken = refreshTokenEntity.getToken();
+
+            // 8. Get the expiration times for the tokens
             Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
-            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(refreshToken);
+            Long refreshTokenExpirationMs = jwtService.getExpirationTimeInSeconds(refreshToken);
 
-            // 7. Return the response
+            // 9. Return the response
             return new AuthenticationResponse(
                     accessToken,
                     refreshToken,
                     accessTokenExpiration,
-                    refreshTokenExpiration,
+                    refreshTokenExpirationMs,
                     savedUser.getId(),
                     savedUser.getEmail(),
                     savedUser.getName(),
@@ -96,21 +110,26 @@ public class AuthenticationService {
 
     }
 
-    public AuthenticationResponse signIn(SignInRequest request) {
+    public AuthenticationResponse signIn(SignInRequest signInRequest, HttpServletRequest httpRequest) {
         try {
             // Use AuthenticationManager to validate credentials
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            request.email(),
-                            request.password()));
+                            signInRequest.email(),
+                            signInRequest.password()));
 
             // If authentication was successful, get the user
-            User user = userRepository.findByEmail(request.email())
-                    .orElseThrow(() -> new UserNotFoundException(request.email()));
+            User user = userRepository.findByEmail(signInRequest.email())
+                    .orElseThrow(() -> new UserNotFoundException(signInRequest.email()));
 
-            // Generate the accessToken and refreshToken
-            String accessToken = jwtService.generateAccessToken(user.getEmail());
-            String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+            // Generate the accessToken
+            String accessToken = jwtService.generateAccessToken(user);
+
+            // Create and store refresh token in database
+            RefreshToken refreshTokenEntity = refreshTokenService.createRefreshToken(user, httpRequest);
+
+            // Get the refreshToken token string
+            String refreshToken = refreshTokenEntity.getToken();
 
             // Get the expiration times for the tokens
             Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
@@ -145,27 +164,31 @@ public class AuthenticationService {
         // Extract the refreshToken from the authorization header
         String refreshToken = authorizationHeader.substring(7);
 
-        // Extract the username from the refreshToken
-        String username = jwtService.extractUsernameFromToken(refreshToken);
+        try {
+            // Verify the refreshToken is valid
+            RefreshToken storedTokenEntity = refreshTokenService.verifyRefreshToken(refreshToken);
 
-        // Check if the user exists in the database
-        User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new UserNotFoundException(username));
+            // Get the user from the refreshTokenEntity
+            User user = storedTokenEntity.getUser();
 
-        // Check if the refreshToken is valid
-        if (jwtService.validateRefreshToken(refreshToken, user)) {
-            // Generate a new accessToken
-            String accessToken = jwtService.generateAccessToken(user.getEmail());
+            // Create a new refresh token (token rotation for security)
+            RefreshToken newRefreshTokenEntity = refreshTokenService.rotateRefreshToken(storedTokenEntity, request);
 
-            // Get the expiration time for the accessToken
-            Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(accessToken);
+            // Generate a new access token
+            String newAccessToken = jwtService.generateAccessToken(user);
 
-            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(refreshToken);
+            // Get the new refreshToken token string
+            String newRefreshToken = newRefreshTokenEntity.getToken();
+
+            // Get expiration times
+            Long accessTokenExpiration = jwtService.getExpirationTimeInSeconds(newAccessToken);
+
+            Long refreshTokenExpiration = jwtService.getExpirationTimeInSeconds(newRefreshToken);
 
             // Return the response
             return ResponseEntity.ok(new AuthenticationResponse(
-                    accessToken,
-                    refreshToken,
+                    newAccessToken,
+                    newRefreshToken,
                     accessTokenExpiration,
                     refreshTokenExpiration,
                     user.getId(),
@@ -173,10 +196,86 @@ public class AuthenticationService {
                     user.getName(),
                     user.getSurname(),
                     user.getRole().name()));
-        } else {
+        } catch (InvalidRefreshTokenException e) {
             return new ResponseEntity<AuthenticationResponse>(HttpStatus.UNAUTHORIZED);
         }
+    }
 
+    public void signOut(HttpServletRequest request) {
+        try {
+            // Get the authorization header from the request
+            String authorizationHeader = request.getHeader("Authorization");
+            // Check if the authrizationHeader is valid
+            if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+                throw new InvalidRequestException("Invalid authorization header");
+            }
+
+            // Extract the refreshToken from the authorization header
+            String refreshToken = authorizationHeader.substring(7);
+            // Find the token
+
+            // Check if it's a refresh token
+            String tokenType = jwtService.extractTypeFromToken(refreshToken);
+            if (!"refresh".equals(tokenType)) {
+                throw new InvalidRequestException("Please provide refresh token for signout");
+            }
+
+            // Get user from token
+            String username = jwtService.extractUsernameFromToken(refreshToken);
+            User user = userRepository.findByEmail(username)
+                    .orElseThrow(() -> new UserNotFoundException(username));
+
+            // Validate refresh token
+            if (!jwtService.validateRefreshToken(refreshToken, user)) {
+                throw new InvalidRequestException("Invalid refresh token");
+            }
+
+            refreshTokenService.findByToken(refreshToken)
+                    .ifPresent(storedToken -> {
+                        // Revoke this specific token
+                        storedToken.setRevoked(true);
+                        refreshTokenRepository.save(storedToken);
+
+                        // Increment the user's tokenVersion
+                        // to invalidate all access tokens too
+                        user.incrementTokenVersion();
+                        userRepository.save(user);
+                    });
+        } catch (Exception e) {
+            throw new InvalidRequestException(e.getMessage());
+        }
+
+    }
+
+    public void changePassword(String email, ChangePasswordRequest request) {
+        // Validate request
+        validateChangePasswordRequest(request);
+
+        // Get user
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        // Check if current password matches
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+            throw new InvalidRequestException("Current password is incorrect");
+        }
+
+        // Check if new password is different from current
+        if (passwordEncoder.matches(request.newPassword(), user.getPassword())) {
+            throw new InvalidRequestException("New password must be different from current password");
+        }
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+
+        // Increment token version to invalidate all existing tokens
+        user.incrementTokenVersion();
+
+        // Save user
+        userRepository.save(user);
+
+        // Revoke all refresh tokens
+        refreshTokenService.revokeAllUserTokens(user);
     }
 
     // ** Validation / Helper Methods **
@@ -263,5 +362,35 @@ public class AuthenticationService {
         Pattern pattern = Pattern.compile(passwordRegex);
         Matcher matcher = pattern.matcher(password);
         return matcher.matches();
+    }
+
+    private void validateChangePasswordRequest(ChangePasswordRequest request) {
+        List<String> errors = new ArrayList<>();
+
+        // Check required fields
+        if (!StringUtils.hasText(request.currentPassword())) {
+            errors.add("Current password is required");
+        }
+        if (!StringUtils.hasText(request.newPassword())) {
+            errors.add("New password is required");
+        }
+        if (!StringUtils.hasText(request.confirmNewPassword())) {
+            errors.add("Password confirmation is required");
+        }
+
+        // Check if passwords match
+        if (!request.newPassword().equals(request.confirmNewPassword())) {
+            errors.add("New password and confirmation do not match");
+        }
+
+        // Validate password strength
+        if (StringUtils.hasText(request.newPassword()) && !isStrongPassword(request.newPassword())) {
+            errors.add(
+                    "New password must be strong: at least 8 characters, one uppercase, one lowercase, one number, and one special character");
+        }
+
+        if (!errors.isEmpty()) {
+            throw new ValidationException(errors);
+        }
     }
 }

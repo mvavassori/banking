@@ -15,6 +15,8 @@ import com.marcovavassori.banking.services.JwtService;
 import com.marcovavassori.banking.services.UserService;
 
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -86,6 +88,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (ExpiredJwtException e) {
             handleExpiredToken(response, e);
+        } catch (SignatureException e) {
+            handleInvalidToken(response, "Invalid signature");
+        } catch (MalformedJwtException e) {
+            handleInvalidToken(response, "Malformed token");
+        } catch (Exception e) {
+            handleInvalidToken(response, "Invalid token");
         }
 
     }
@@ -95,6 +103,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 HttpServletResponse.SC_UNAUTHORIZED,
                 "Token Expired",
                 "Your session has expired. Please sign in again.",
+                LocalDateTime.now());
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), errorResponse);
+    }
+
+    private void handleInvalidToken(HttpServletResponse response, String message) throws IOException {
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpServletResponse.SC_UNAUTHORIZED,
+                "Invalid Token",
+                message,
                 LocalDateTime.now());
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

@@ -52,6 +52,15 @@ public class User implements UserDetails {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Account> accounts; // List of Accounts associated with this User
 
+    // One-to-Many relationship with RefreshToken (User can have multiple
+    // RefreshTokens)
+    // user is the field in the RefreshToken entity that maps this relationship
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<RefreshToken> refreshTokens;
+
+    @Column(nullable = false)
+    private Integer tokenVersion = 0;
+
     // ** Default Constructor (no-args constructor) - Required by JPA **
     public User() {
 
@@ -59,12 +68,13 @@ public class User implements UserDetails {
 
     // ** Constructor with arguments (Optional, for convenience when you need to
     // create new entity instances in your application code) **
-    public User(String name, String surname, String email, String password, UserRole role) {
+    public User(String name, String surname, String email, String password, UserRole role, Integer tokenVersion) {
         this.name = name;
         this.surname = surname;
         this.email = email;
         this.password = password;
         this.role = role;
+        this.tokenVersion = tokenVersion;
     }
 
     // **Getters and Setters for all fields (Essential for JPA to work correctly)**
@@ -140,6 +150,26 @@ public class User implements UserDetails {
 
     public void setAccounts(List<Account> accounts) { // Setter for the accounts list
         this.accounts = accounts;
+    }
+
+    public List<RefreshToken> getRefreshTokens() {
+        return refreshTokens;
+    }
+
+    public void setRefreshTokens(List<RefreshToken> refreshTokens) {
+        this.refreshTokens = refreshTokens;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    public void incrementTokenVersion() {
+        this.tokenVersion++;
     }
 
     // ** UserDetails interface methods **

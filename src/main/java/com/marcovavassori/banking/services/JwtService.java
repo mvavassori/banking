@@ -2,12 +2,16 @@ package com.marcovavassori.banking.services;
 
 import java.util.Date;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+
+import com.marcovavassori.banking.models.User;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -20,24 +24,35 @@ public class JwtService {
     private String secret;
 
     @Value("${jwt.expiration.accessToken}")
-    private Long accessTokenExpiration;
+    private Long accessTokenExpirationMs;
 
     @Value("${jwt.expiration.refreshToken}")
-    private Long refreshTokenExpiration;
+    private Long refreshTokenExpirationMs;
 
-    public String generateAccessToken(String username) {
-        return generateToken(username, accessTokenExpiration);
-    }
-
-    public String generateRefreshToken(String username) {
-        return generateToken(username, refreshTokenExpiration);
-    }
-
-    private String generateToken(String username, Long expiration) {
+    public String generateAccessToken(User user) {
         return Jwts.builder()
-                .subject(username)
+                .subject(user.getUsername())
+                .claim("authorities", user.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toList()))
+                .claim("version", user.getTokenVersion())
+                .claim("type", "access")
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .expiration(new Date(System.currentTimeMillis() + accessTokenExpirationMs))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateRefreshToken(User user) {
+        return Jwts.builder()
+                .subject(user.getUsername())
+                .claim("authorities", user.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toList()))
+                .claim("version", user.getTokenVersion())
+                .claim("type", "refresh")
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpirationMs))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -64,6 +79,14 @@ public class JwtService {
         return extractClaimFromToken(token, Claims::getExpiration);
     }
 
+    public Integer extractVersionFromToken(String token) {
+        return extractClaimFromToken(token, claims -> claims.get("version", Integer.class));
+    }
+
+    public String extractTypeFromToken(String token) {
+        return extractClaimFromToken(token, claims -> claims.get("type", String.class));
+    }
+
     public Long getExpirationTimeInSeconds(String token) {
         Date expirationDate = extractExpirationDateFromToken(token);
         Date now = new Date();
@@ -74,14 +97,22 @@ public class JwtService {
         return extractExpirationDateFromToken(token).before(new Date());
     }
 
-    public boolean validateAccessToken(String token, UserDetails user) {
+    public boolean validateAccessToken(String token, UserDetails userDetails) {
+        User user = (User) userDetails;
         String username = extractUsernameFromToken(token);
-        return username.equals(user.getUsername()) && !isTokenExpired(token);
+        Integer version = extractVersionFromToken(token);
+        String type = extractTypeFromToken(token);
+        return username.equals(user.getUsername()) && version.equals(user.getTokenVersion()) && type.equals("access")
+                && !isTokenExpired(token);
     }
 
-    public boolean validateRefreshToken(String token, UserDetails user) {
+    public boolean validateRefreshToken(String token, UserDetails userDetails) {
+        User user = (User) userDetails;
         String username = extractUsernameFromToken(token);
-        return username.equals(user.getUsername()) && !isTokenExpired(token);
+        Integer version = extractVersionFromToken(token);
+        String type = extractTypeFromToken(token);
+        return username.equals(user.getUsername()) && version.equals(user.getTokenVersion()) && type.equals("refresh")
+                && !isTokenExpired(token);
     }
 
     private SecretKey getSigningKey() {
