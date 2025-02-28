@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -19,14 +20,9 @@ import org.springframework.security.web.header.writers.XXssProtectionHeaderWrite
 import com.marcovavassori.banking.filters.JwtAuthenticationFilter;
 import com.marcovavassori.banking.services.UserService;
 
-/**
- * Central security configuration class for the application.
- * 
- * @Configuration: Indicates this is a Spring configuration class
- * @EnableWebSecurity: Enables Spring Security's web security support
- **/
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
         private final UserService userService;
@@ -74,15 +70,19 @@ public class SecurityConfig {
                                                 req -> req
                                                                 // Public endpoints that don't require authentication
                                                                 .requestMatchers(
-                                                                                "/", // Home page
+                                                                                "/",
                                                                                 "/api/auth/signin/**",
                                                                                 "/api/auth/signup/**",
                                                                                 "/api/auth/refresh-token",
                                                                                 "/api/auth/signout",
-                                                                                "/error"
-                                                                // endpoint
-                                                                ).permitAll()
-                                                                .requestMatchers("/admin/**").hasAuthority("ADMIN")
+                                                                                "/error")
+                                                                .permitAll()
+                                                                // .requestMatchers(
+                                                                // // Admin-only endpoints
+                                                                // "/admin/**"
+                                                                // )
+                                                                // .hasAuthority("ADMIN")
+                                                                .requestMatchers("/api/user/profile").authenticated()
                                                                 // All other endpoints require authentication
                                                                 .anyRequest().authenticated())
                                 // Set the service to load user details when authenticating
