@@ -4,6 +4,9 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -67,6 +70,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInvalidTransaction(InvalidTransactionException e) {
         // 400 Bad Request - Client sent invalid data
         return createErrorResponse(HttpStatus.BAD_REQUEST, "Invalid Transaction", e.getMessage());
+    }
+
+    @ExceptionHandler({ AccessDeniedException.class, AuthorizationDeniedException.class })
+    public ResponseEntity<ErrorResponse> handleAccessDenied(Exception e) {
+        // 403 Forbidden - Access denied
+        return createErrorResponse(HttpStatus.FORBIDDEN, "Access Denied", e.getMessage());
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException e) {
+        // 401 Unauthorized - Authentication failed
+        return createErrorResponse(HttpStatus.UNAUTHORIZED, "Bad Credentials", e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

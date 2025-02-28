@@ -22,7 +22,10 @@ import com.marcovavassori.banking.services.UserService;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true, // Enables Spring Security pre/post annotations
+                securedEnabled = true, // Enables Spring Security @Secured annotation
+                jsr250Enabled = true // Enables Spring Security JSR-250 annotations
+)
 public class SecurityConfig {
 
         private final UserService userService;
