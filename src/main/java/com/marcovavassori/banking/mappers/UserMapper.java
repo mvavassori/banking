@@ -1,14 +1,21 @@
 package com.marcovavassori.banking.mappers;
 
 import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.marcovavassori.banking.models.User;
-import com.marcovavassori.banking.models.Account;
 import com.marcovavassori.banking.dtos.UserDTO;
-import com.marcovavassori.banking.dtos.AccountDTO;
 
 @Component
 public class UserMapper {
+
+    private final AccountMapper accountMapper;
+
+    @Autowired
+    public UserMapper(AccountMapper accountMapper) {
+        this.accountMapper = accountMapper;
+    }
 
     public UserDTO toDTO(User user) {
         if (user == null)
@@ -23,21 +30,7 @@ public class UserMapper {
                 user.getCreatedAt(),
                 user.getUpdatedAt(),
                 user.getAccounts() != null
-                        ? user.getAccounts().stream().map(this::toAccountDTO).toList()
+                        ? user.getAccounts().stream().map(accountMapper::toDTO).toList()
                         : List.of());
-    }
-
-    private AccountDTO toAccountDTO(Account account) {
-        if (account == null)
-            return null;
-
-        return new AccountDTO(
-                account.getId(),
-                account.getAccountNumber(),
-                account.getAccountType().name(),
-                account.getBalance(),
-                account.getCurrency().name(),
-                account.getCreatedAt(),
-                account.getUpdatedAt());
     }
 }

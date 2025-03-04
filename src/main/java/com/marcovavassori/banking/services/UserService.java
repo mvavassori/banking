@@ -1,5 +1,7 @@
 package com.marcovavassori.banking.services;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -12,6 +14,7 @@ import com.marcovavassori.banking.repositories.UserRepository;
 @Service
 public class UserService implements UserDetailsService {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
     // Declare dependencies
     private final UserRepository userRepository;
 
@@ -36,6 +39,7 @@ public class UserService implements UserDetailsService {
 
     public void deleteUser(Long id) {
         if (!userRepository.existsById(id)) {
+            logger.warn("Failed to delete user: User not found with ID: {}", id);
             throw new UserNotFoundException(id);
         }
         userRepository.deleteById(id);

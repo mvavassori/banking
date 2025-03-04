@@ -1,18 +1,19 @@
 package com.marcovavassori.banking.services;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.marcovavassori.banking.dtos.CreateAccountRequest;
 import com.marcovavassori.banking.exceptions.AccountNotFoundException;
 import com.marcovavassori.banking.exceptions.UserNotFoundException;
 import com.marcovavassori.banking.models.Account;
-import com.marcovavassori.banking.models.enums.AccountCurrency;
-import com.marcovavassori.banking.models.enums.AccountType;
+import com.marcovavassori.banking.models.User;
 import com.marcovavassori.banking.repositories.AccountRepository;
 import com.marcovavassori.banking.repositories.UserRepository;
 
@@ -20,6 +21,8 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class AccountService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
 
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
@@ -33,39 +36,46 @@ public class AccountService {
     // ** Business Logic Methods **
 
     @Transactional
-    public void createAccount(Account account) {
-        // 1. Validate user input
-        validateAccountData(account);
-
-        // 2. Check if the user exists
-        Long userId = account.getUser().getId();
+    public void createAccount(CreateAccountRequest createAccountRequest, Long userId) {
+        // Check if the user exists
         var userOpt = userRepository.findById(userId);
         if (userOpt.isEmpty()) {
+            logger.warn("Failed to create account: User with ID {} not found", userId);
             throw new UserNotFoundException(userId);
         }
+
+        User user = userOpt.get();
         // Set the full user entity from the database (helps avoid detached entity
         // issues)
-        account.setUser(userOpt.get());
+        Account account = new Account();
 
-        // 3. Generate a unique account number
+        account.setAccountType(createAccountRequest.accountType());
+        account.setCurrency(createAccountRequest.accountCurrency());
+        account.setUser(user);
+        account.setBalance(BigDecimal.ZERO); // Set the initial balance to zero
+
+        // Generate a unique account number
         String accountNumber = generateAccountNumber();
 
-        // 4. Check if the generated account number is already in use and if it's
+        // Check if the generated account number is already in use and if it's
         // already used, it generate a new one until it finds a unique one
         while (accountRepository.findByAccountNumber(accountNumber) != null) {
             accountNumber = generateAccountNumber();
         }
 
-        // 5. Set the generated account number
+        // Set the generated account number
         account.setAccountNumber(accountNumber);
 
-        // 4. Save the account
+        // Save the account
         accountRepository.save(account);
+        logger.info("Created new account: number={}, type={}, userId={}",
+                accountNumber, account.getAccountType(), userId);
     }
 
     public Account getAccount(Long id) {
         var accountOpt = accountRepository.findById(id);
         if (accountOpt.isEmpty()) {
+            logger.warn("Failed to get account: Account not found with ID: {}", id);
             throw new AccountNotFoundException(id);
         }
         return accountOpt.get();
@@ -84,48 +94,14 @@ public class AccountService {
     @Transactional
     public void deleteAccount(Long id) {
         if (!accountRepository.existsById(id)) {
+            logger.warn("Failed to delete account: Account not found with ID: {}", id);
             throw new AccountNotFoundException(id);
         }
         accountRepository.deleteById(id);
+        logger.info("Successfully deleted account with ID: {}", id);
     }
 
-    // ** Validation / Helper Methods **
-
-    private void validateAccountData(Account account) { // Helper to check for blank fields
-        if (account == null) {
-            throw new IllegalArgumentException("Account data cannot be null.");
-        }
-        if (account.getAccountType() == null) {
-            throw new IllegalArgumentException("Account type must be specified.");
-        }
-
-        // Check if the account type is valid based on enum AccountType
-        if (!Arrays.asList(AccountType.values()).contains(account.getAccountType())) {
-            throw new IllegalArgumentException("Invalid account type: " + account.getAccountType());
-        }
-
-        if (account.getBalance() == null) {
-            throw new IllegalArgumentException("Balance must be specified.");
-        }
-        if (account.getBalance().compareTo(BigDecimal.ZERO) < 0) { // Ensure balance is not negative
-            throw new IllegalArgumentException("Initial balance cannot be negative.");
-        }
-        if (account.getCurrency() == null) {
-            throw new IllegalArgumentException("Currency must be specified.");
-        }
-
-        // Check if the currency is valid based on enum AccountCurrency
-        if (!Arrays.asList(AccountCurrency.values()).contains(account.getCurrency())) {
-            throw new IllegalArgumentException("Invalid currency: " + account.getCurrency());
-        }
-
-        if (account.getUser() == null) {
-            throw new IllegalArgumentException("User must be associated with the account.");
-        }
-        if (account.getUser().getId() == null) { // Ensure User object has an ID
-            throw new IllegalArgumentException("User ID must be provided for account creation.");
-        }
-    }
+    // ** Helper Methods **
 
     private String generateAccountNumber() {
         return UUID.randomUUID().toString().replaceAll("-", "").substring(0, 16);
