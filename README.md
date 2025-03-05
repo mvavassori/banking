@@ -1,6 +1,6 @@
 # Banking API - Spring Boot Backend
 
-This project is a robust and secure RESTful API for a banking application, built using Spring Boot. It demonstrates a solid understanding of backend development principles, Java best practices, and modern Spring features. It's designed to be a clear and concise example of my coding abilities, suitable for review by potential employers.
+This project is a robust and secure RESTful API for a banking application, built using Spring Boot. It demonstrates a solid understanding of backend development principles, Java best practices, and modern Spring features. 
 
 ## Project Overview
 
