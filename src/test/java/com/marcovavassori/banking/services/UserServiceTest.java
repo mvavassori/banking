@@ -25,7 +25,6 @@ class UserServiceTest {
     @InjectMocks
     private UserService userService;
 
-    // Test for getUser when the user exists
     @Test
     void testGetUser_whenUserExists_returnsUser() {
         Long userId = 1L;
@@ -41,7 +40,6 @@ class UserServiceTest {
         verify(userRepository).findById(userId);
     }
 
-    // Test for getUser when the user doesn't exist
     @Test
     void testGetUser_whenUserDoesNotExist_throwsException() {
         Long userId = 1L;
@@ -51,7 +49,6 @@ class UserServiceTest {
         verify(userRepository).findById(userId);
     }
 
-    // Test for getUserByEmailWithAccounts when the user exists
     @Test
     void testGetUserByEmailWithAccounts_whenUserExists_returnsUser() {
         String email = "test@example.com";
@@ -67,7 +64,6 @@ class UserServiceTest {
         verify(userRepository).findByEmailWithAccounts(email);
     }
 
-    // Test for getUserByEmailWithAccounts when the user doesn't exist
     @Test
     void testGetUserByEmailWithAccounts_whenUserDoesNotExist_throwsException() {
         String email = "test@example.com";
@@ -77,7 +73,6 @@ class UserServiceTest {
         verify(userRepository).findByEmailWithAccounts(email);
     }
 
-    // Test for deleteUser when the user exists
     @Test
     void testDeleteUser_whenUserExists_deletesUser() {
         Long userId = 1L;
@@ -89,7 +84,6 @@ class UserServiceTest {
         verify(userRepository).deleteById(userId);
     }
 
-    // Test for deleteUser when the user doesn't exist
     @Test
     void testDeleteUser_whenUserDoesNotExist_throwsException() {
         Long userId = 1L;
@@ -100,7 +94,6 @@ class UserServiceTest {
         verify(userRepository, never()).deleteById(userId);
     }
 
-    // Test for loadUserByUsername when the user exists
     @Test
     void testLoadUserByUsername_whenUserExists_returnsUserDetails() {
         String email = "test@example.com";
@@ -116,7 +109,6 @@ class UserServiceTest {
         verify(userRepository).findByEmail(email);
     }
 
-    // Test for loadUserByUsername when the user doesn't exist
     @Test
     void testLoadUserByUsername_whenUserDoesNotExist_throwsException() {
         String email = "test@example.com";
