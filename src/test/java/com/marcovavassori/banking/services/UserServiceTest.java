@@ -1,0 +1,128 @@
+package com.marcovavassori.banking.services;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Optional;
+
+import com.marcovavassori.banking.exceptions.UserNotFoundException;
+import com.marcovavassori.banking.models.User;
+import com.marcovavassori.banking.repositories.UserRepository;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.userdetails.UserDetails;
+
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
+    private UserRepository userRepository;
+
+    @InjectMocks
+    private UserService userService;
+
+    // Test for getUser when the user exists
+    @Test
+    void testGetUser_whenUserExists_returnsUser() {
+        Long userId = 1L;
+        User user = new User();
+        user.setId(userId);
+        user.setEmail("test@example.com");
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        User foundUser = userService.getUser(userId);
+        assertNotNull(foundUser);
+        assertEquals(userId, foundUser.getId());
+        verify(userRepository).findById(userId);
+    }
+
+    // Test for getUser when the user doesn't exist
+    @Test
+    void testGetUser_whenUserDoesNotExist_throwsException() {
+        Long userId = 1L;
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.getUser(userId));
+        verify(userRepository).findById(userId);
+    }
+
+    // Test for getUserByEmailWithAccounts when the user exists
+    @Test
+    void testGetUserByEmailWithAccounts_whenUserExists_returnsUser() {
+        String email = "test@example.com";
+        User user = new User();
+        user.setId(1L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmailWithAccounts(email)).thenReturn(Optional.of(user));
+
+        User foundUser = userService.getUserByEmailWithAccounts(email);
+        assertNotNull(foundUser);
+        assertEquals(email, foundUser.getEmail());
+        verify(userRepository).findByEmailWithAccounts(email);
+    }
+
+    // Test for getUserByEmailWithAccounts when the user doesn't exist
+    @Test
+    void testGetUserByEmailWithAccounts_whenUserDoesNotExist_throwsException() {
+        String email = "test@example.com";
+        when(userRepository.findByEmailWithAccounts(email)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.getUserByEmailWithAccounts(email));
+        verify(userRepository).findByEmailWithAccounts(email);
+    }
+
+    // Test for deleteUser when the user exists
+    @Test
+    void testDeleteUser_whenUserExists_deletesUser() {
+        Long userId = 1L;
+        when(userRepository.existsById(userId)).thenReturn(true);
+
+        userService.deleteUser(userId);
+
+        verify(userRepository).existsById(userId);
+        verify(userRepository).deleteById(userId);
+    }
+
+    // Test for deleteUser when the user doesn't exist
+    @Test
+    void testDeleteUser_whenUserDoesNotExist_throwsException() {
+        Long userId = 1L;
+        when(userRepository.existsById(userId)).thenReturn(false);
+
+        assertThrows(UserNotFoundException.class, () -> userService.deleteUser(userId));
+        verify(userRepository).existsById(userId);
+        verify(userRepository, never()).deleteById(userId);
+    }
+
+    // Test for loadUserByUsername when the user exists
+    @Test
+    void testLoadUserByUsername_whenUserExists_returnsUserDetails() {
+        String email = "test@example.com";
+        User user = new User();
+        user.setId(1L);
+        user.setEmail(email);
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+
+        UserDetails userDetails = userService.loadUserByUsername(email);
+        assertNotNull(userDetails);
+        assertEquals(email, userDetails.getUsername());
+        verify(userRepository).findByEmail(email);
+    }
+
+    // Test for loadUserByUsername when the user doesn't exist
+    @Test
+    void testLoadUserByUsername_whenUserDoesNotExist_throwsException() {
+        String email = "test@example.com";
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        assertThrows(UserNotFoundException.class, () -> userService.loadUserByUsername(email));
+        verify(userRepository).findByEmail(email);
+    }
+}
