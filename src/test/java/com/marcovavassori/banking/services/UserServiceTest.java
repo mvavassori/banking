@@ -16,12 +16,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.userdetails.UserDetails;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith(MockitoExtension.class) // to enable Mockito support
 class UserServiceTest {
 
+    // @Mock is used to create a mock instance of the UserRepository
     @Mock
     private UserRepository userRepository;
 
+    // @InjectMocks tells Mockito to inject the mock repository into the UserService
+    // instance
     @InjectMocks
     private UserService userService;
 
@@ -32,6 +35,7 @@ class UserServiceTest {
         user.setId(userId);
         user.setEmail("test@example.com");
 
+        // Mockito.when is used to create a mock behavior for the findById method
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
         User foundUser = userService.getUser(userId);
