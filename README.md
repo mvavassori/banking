@@ -1,6 +1,6 @@
 # Banking API - Spring Boot Backend
 
-This project is a robust and secure RESTful API for a banking application, built using Spring Boot. It demonstrates a solid understanding of backend development principles, Java best practices, and modern Spring features. 
+This project is a robust and secure RESTful API for a banking application, built using Spring Boot. It demonstrates a solid understanding of backend development principles, Java best practices, and modern Spring features.
 
 ## Project Overview
 
@@ -120,5 +120,4 @@ The codebase is structured following standard Spring Boot conventions, making it
 - **Clear Separation of Concerns:** The code is organized into distinct layers (controllers, services, models, repositories), promoting modularity and maintainability.
 - **Use of DTOs:** Data Transfer Objects (DTOs) are used to decouple the API from the internal data model, improving flexibility and security.
 - **Custom exceptions:** Custom exceptions are used to provide meaningful error messages.
-
-This project demonstrates my ability to build a secure, well-structured, and functional backend API using Spring Boot. I am confident in my ability to contribute to your team and build high-quality software.
+- **Unit Tests:** Comprehensive unit tests are provided for the service layer, ensuring the correctness of the business logic. Key tested classes include `UserService`, `AccountService`, and `TransactionService`.
