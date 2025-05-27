@@ -112,8 +112,6 @@ public class TransactionService {
                     (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(root.get("amount"), maxAmount));
         }
 
-        // add more filters if needed
-
         return transactionRepository.findAll(spec, pageable);
     }
 
